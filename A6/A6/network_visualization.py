@@ -41,7 +41,14 @@ def compute_saliency_maps(X, y, model):
     # Hint: X.grad.data stores the gradients                                     #
     ##############################################################################
     # Replace "pass" statement with your code
-    pass
+    scores = model(X) #(N, C)
+    scores = torch.gather(scores, dim=1, index = y.unsqueeze(-1)).squeeze()
+    
+    loss = torch.sum(scores)
+    loss.backward()
+
+    saliency = X.grad.data.abs().max(dim = 1).values
+
     ##############################################################################
     #               END OF YOUR CODE                                             #
     ##############################################################################
@@ -84,7 +91,20 @@ def make_adversarial_attack(X, target_y, model, max_iter=100, verbose=True):
     # You can print your progress over iterations to check your algorithm.       #
     ##############################################################################
     # Replace "pass" statement with your code
-    pass
+    for epoch in range(max_iter):
+      score = model(X_adv) # (1, C)
+      max_score, label = torch.max(score, axis=1)
+      target_score = score[0, target_y].squeeze()
+      print('Iteration %d: target score %.3f, max score %.3f' % (epoch + 1, target_score.item(), max_score.item()))
+      
+      if label.item() == target_y:
+          break
+
+      target_score.backward()
+    
+      X_adv.grad /= torch.linalg.norm(X_adv.grad)
+      X_adv.data += learning_rate * X_adv.grad.data
+      X_adv.grad.data.zero_()
     ##############################################################################
     #                             END OF YOUR CODE                               #
     ##############################################################################
@@ -119,7 +139,15 @@ def class_visualization_step(img, target_y, model, **kwargs):
     # after each step.                                                     #
     ########################################################################
     # Replace "pass" statement with your code
-    pass
+    score = model(img) # (1, C)
+    target_score = score[0, target_y].squeeze() # Sy(I)
+    target_score -= l2_reg * torch.square(torch.linalg.norm(img)) # Sy(I)-R(I)
+    
+    target_score.backward()
+
+    img.data += learning_rate * img.grad.data
+
+    img.grad.data.zero_() # clear the gradient
     ########################################################################
     #                             END OF YOUR CODE                         #
     ########################################################################
